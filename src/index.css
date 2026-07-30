@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  :root {
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f1f5f9;
+    --color-border: #e2e8f0;
+    --color-text: #0f172a;
+    --color-text-secondary: #64748b;
+    --color-accent: #6366f1;
+  }
+
+  .dark {
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-surface-hover: #334155;
+    --color-border: #334155;
+    --color-text: #f1f5f9;
+    --color-text-secondary: #94a3b8;
+    --color-accent: #818cf8;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 dark:bg-slate-800/70 backdrop-blur-lg border border-white/20 dark:border-slate-700/30;
+  }
+
+  .card {
+    @apply rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/50 p-6 transition-all duration-300;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+
+  .card:hover {
+    @apply shadow-xl;
+    border-color: var(--color-accent);
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-xl font-medium text-white transition-all duration-200 
+           bg-gradient-to-r from-primary-500 to-primary-600 
+           hover:from-primary-600 hover:to-primary-700
+           shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/30
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200
+           bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200
+           hover:bg-slate-200 dark:hover:bg-slate-600
+           active:scale-95;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 rounded-xl font-medium text-white transition-all duration-200
+           bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25
+           active:scale-95;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-xl border transition-all duration-200 outline-none
+           bg-transparent;
+    border-color: var(--color-border);
+    color: var(--color-text);
+  }
+
+  .input-field:focus {
+    border-color: var(--color-accent);
+    @apply ring-2 ring-primary-500/20;
+  }
+
+  .stat-value {
+    @apply text-2xl font-bold;
+    color: var(--color-text);
+  }
+
+  .stat-label {
+    @apply text-sm font-medium;
+    color: var(--color-text-secondary);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-500;
+}
+
+/* Animated gradient for active timer */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background: linear-gradient(-45deg, #6366f1, #8b5cf6, #a855f7, #6366f1);
+  background-size: 400% 400%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Fade-in animation for the install banner and other elements */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in-up 0.4s ease-out;
+}
