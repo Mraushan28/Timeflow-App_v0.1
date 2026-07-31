@@ -4,14 +4,8 @@ const AppContext = createContext();
 
 const STORAGE_KEY = 'timeflow_state';
 
-const defaultTasks = [
-  { id: 'task-1', name: 'Work', worker: 'Rahul', color: '#6366f1', icon: '💼' },
-  { id: 'task-2', name: 'Study', worker: 'Rahul', color: '#10b981', icon: '📚' },
-  { id: 'task-3', name: 'Exercise', worker: 'Rahul', color: '#f59e0b', icon: '🏋️' },
-  { id: 'task-4', name: 'Sleep', worker: 'Rahul', color: '#8b5cf6', icon: '😴' },
-  { id: 'task-5', name: 'Social Media', worker: 'Rahul', color: '#ef4444', icon: '📱' },
-  { id: 'task-6', name: 'Leisure', worker: 'Rahul', color: '#06b6d4', icon: '🎮' },
-];
+// Zero-state: no default tasks — app starts completely empty
+const defaultTasks = [];
 
 /**
  * On page reload, any active (non-paused) timers have a stale `startTime`.
@@ -38,35 +32,31 @@ function syncActiveTimersOnLoad(activeTimers) {
   return synced;
 }
 
-const initialState = {
-  tasks: defaultTasks,
-  activeTimers: {},
-  history: {},
-  theme: 'light',
-  appActive: false,
-  selectedWorker: 'All Workers',
-};
+function createFreshState() {
+  return {
+    tasks: [],
+    activeTimers: {},
+    history: {},
+    theme: 'light',
+    appActive: false,
+    selectedWorker: 'All Workers',
+  };
+}
+
+const initialState = createFreshState();
 
 function loadState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      // First ever visit — start with empty history (zero state)
-      return {
-        ...initialState,
-        history: {},
-      };
+      // First ever visit — start with empty state (zero state)
+      return createFreshState();
     }
     const parsed = JSON.parse(stored);
-    const existingIds = new Set((parsed.tasks || []).map(t => t.id));
-    const mergedTasks = [
-      ...defaultTasks.filter(t => !existingIds.has(t.id)),
-      ...(parsed.tasks || []),
-    ];
 
     // Normalize every field with explicit fallbacks
     const loadedState = {
-      tasks: mergedTasks,
+      tasks: parsed.tasks || [],
       activeTimers: syncActiveTimersOnLoad(parsed.activeTimers || {}),
       history: parsed.history || {},
       theme: parsed.theme || 'light',
@@ -84,7 +74,7 @@ function loadState() {
     return loadedState;
   } catch (e) {
     console.warn('Failed to load state, using defaults:', e);
-    return { ...initialState, history: {} };
+    return createFreshState();
   }
 }
 
@@ -110,6 +100,15 @@ function getTodayKey() {
 
 function appReducer(state, action) {
   switch (action.type) {
+    case 'RESET_ALL_DATA': {
+      // Clear localStorage completely and return fresh zero state
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.warn('Failed to clear localStorage:', e);
+      }
+      return createFreshState();
+    }
     case 'TOGGLE_THEME': {
       return { ...state, theme: state.theme === 'light' ? 'dark' : 'light' };
     }
@@ -137,7 +136,6 @@ function appReducer(state, action) {
       const { taskId } = action.payload;
       const newActiveTimers = { ...state.activeTimers };
       delete newActiveTimers[taskId];
-      // History is PERMANENT — we do NOT remove historical data for completed tasks
       return {
         ...state,
         tasks: state.tasks.filter(t => t.id !== taskId),
@@ -166,7 +164,6 @@ function appReducer(state, action) {
     case 'PAUSE_TIMER': {
       const existing = state.activeTimers[action.payload.taskId];
       if (!existing) return state;
-      // elapsed is pre-computed by the caller (handlePause in TimerCard)
       return {
         ...state,
         activeTimers: {
@@ -207,7 +204,6 @@ function appReducer(state, action) {
       return { ...state, activeTimers: { ...state.activeTimers, [action.payload.taskId]: { ...existing, alarmActive: true } } };
     }
     case 'LOG_ELAPSED': {
-      // Delta-based: compute time since last sync, add to elapsed, reset startTime
       const existing = state.activeTimers[action.payload.taskId];
       if (!existing || existing.paused) return state;
       const now = Date.now();
@@ -273,6 +269,7 @@ export function AppProvider({ children }) {
   const stopTimer = useCallback((id, elapsed) => dispatch({ type: 'STOP_TIMER', payload: { taskId: id, elapsed } }), []);
   const dismissAlarm = useCallback((id) => dispatch({ type: 'DISMISS_ALARM', payload: { taskId: id } }), []);
   const setAlarmActive = useCallback((id) => dispatch({ type: 'SET_ALARM_ACTIVE', payload: { taskId: id } }), []);
+  const resetAllData = useCallback(() => dispatch({ type: 'RESET_ALL_DATA' }), []);
 
   const workers = ['All Workers', ...new Set(state.tasks.map(t => t.worker).filter(Boolean))];
 
@@ -282,6 +279,7 @@ export function AppProvider({ children }) {
     addTask, renameTask, deleteTask,
     startTimer, pauseTimer, resumeTimer, stopTimer,
     dismissAlarm, setAlarmActive,
+    resetAllData,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
