@@ -76,7 +76,7 @@ try {
   sizes.forEach(s => {
     const buf = generateIcon(s);
     writeFileSync(`public/pwa-${s}x${s}.png`, buf);
-    console.log(`✅ Generated pwa-${s}x${s}.png`);
+    console.log(`Generated pwa-${s}x${s}.png`);
   });
 } catch (e) {
   console.error('Canvas generation failed:', e.message);
@@ -94,6 +94,6 @@ try {
       <text x="${s/2}" y="${s/2 + s*0.02}" font-family="Arial,sans-serif" font-size="${s*0.45}" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">TF</text>
     </svg>`;
     writeFileSync(`public/pwa-${s}x${s}.svg`, svg);
-    console.log(`✅ Generated pwa-${s}x${s}.svg (fallback)`);
+    console.log(`Generated pwa-${s}x${s}.svg (fallback)`);
   });
 }

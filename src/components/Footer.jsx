@@ -26,7 +26,7 @@ export default function Footer() {
           {/* Credits */}
           <div className="text-center md:text-right">
             <p className="text-sm font-medium text-slate-200">
-              Developed by <span className="text-primary-400 font-semibold">Rahul Roshan</span>
+              Developed by <span className="text-primary-400 font-semibold">Rahul Raushan</span>
             </p>
             <p className="text-xs text-slate-500 mt-1">
               &copy; 2026 Time Management & Daily Activity Audit App. All rights reserved.

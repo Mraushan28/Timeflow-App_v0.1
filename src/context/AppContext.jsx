@@ -14,28 +14,6 @@ const defaultTasks = [
 ];
 
 /**
- * Generate sample history data for first-time users.
- */
-function generateSampleHistory() {
-  const now = new Date();
-  const history = {};
-  for (let daysAgo = 0; daysAgo < 5; daysAgo++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - daysAgo);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    history[key] = {
-      'task-1': Math.floor(Math.random() * 14400 + 7200),
-      'task-2': Math.floor(Math.random() * 7200 + 3600),
-      'task-3': Math.floor(Math.random() * 1800 + 1800),
-      'task-4': Math.floor(Math.random() * 10800 + 21600),
-      'task-5': Math.floor(Math.random() * 1800 + 600),
-      'task-6': Math.floor(Math.random() * 3600 + 1800),
-    };
-  }
-  return history;
-}
-
-/**
  * On page reload, any active (non-paused) timers have a stale `startTime`.
  * Re-sync them: compute elapsed = stored_elapsed + (now - stored_startTime),
  * then reset startTime to now so subsequent delta calculations are correct.
@@ -73,10 +51,10 @@ function loadState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      // First ever visit — populate sample data
+      // First ever visit — start with empty history (zero state)
       return {
         ...initialState,
-        history: generateSampleHistory(),
+        history: {},
       };
     }
     const parsed = JSON.parse(stored);
@@ -106,7 +84,7 @@ function loadState() {
     return loadedState;
   } catch (e) {
     console.warn('Failed to load state, using defaults:', e);
-    return { ...initialState, history: generateSampleHistory() };
+    return { ...initialState, history: {} };
   }
 }
 
