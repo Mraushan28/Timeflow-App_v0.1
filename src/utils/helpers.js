@@ -11,13 +11,15 @@ export function formatTime(totalSeconds) {
 
 /**
  * Format seconds into a human-readable short string (e.g., "2h 30m")
+ * A zero/empty value renders as "0h 0m" (absolute zero state).
  */
 export function formatTimeShort(totalSeconds) {
-  if (totalSeconds === null || totalSeconds === undefined || totalSeconds < 0) return '0m';
+  if (totalSeconds === null || totalSeconds === undefined || totalSeconds < 0) return '0h 0m';
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h === 0 && m === 0) return '0h 0m';
   if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  return `0h ${m}m`;
 }
 
 /**

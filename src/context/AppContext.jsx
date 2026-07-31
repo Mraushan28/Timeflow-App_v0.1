@@ -45,6 +45,28 @@ function createFreshState() {
 
 const initialState = createFreshState();
 
+/**
+ * Detect legacy hardcoded/mock sample data.
+ * Real user-created tasks use IDs generated as `task-<timestamp>`.
+ * Anything else (task-1, task-2, sample-*, mock-*, demo-*, seed-*, etc.)
+ * is considered pre-populated sample data and should be cleared so
+ * existing users automatically transition to the fresh clean zero state.
+ */
+function containsMockData(tasks) {
+  if (!Array.isArray(tasks)) return false;
+  if (tasks.length === 0) return false;
+  return tasks.some((t) => {
+    if (!t || typeof t.id !== 'string') return true;
+    // Legacy generator IDs like task-1, task-2
+    if (/^task-\d{1,4}$/.test(t.id)) return true;
+    // Explicit sample/mock/demo/seed prefixes
+    if (/^(sample|mock|demo|seed)-/i.test(t.id)) return true;
+    // Any ID that does not match the real generator pattern
+    if (!/^task-\d{13,}$/.test(t.id)) return true;
+    return false;
+  });
+}
+
 function loadState() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -53,6 +75,17 @@ function loadState() {
       return createFreshState();
     }
     const parsed = JSON.parse(stored);
+
+    // AUTO-CLEAR legacy mock/sample data so existing users land on the
+    // fresh clean zero state instead of old pre-populated sample history.
+    if (containsMockData(parsed.tasks)) {
+      try {
+        localStorage.clear();
+      } catch (e) {
+        console.warn('Failed to clear mock data from localStorage:', e);
+      }
+      return createFreshState();
+    }
 
     // Normalize every field with explicit fallbacks
     const loadedState = {
@@ -103,7 +136,7 @@ function appReducer(state, action) {
     case 'RESET_ALL_DATA': {
       // Clear localStorage completely and return fresh zero state
       try {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.clear();
       } catch (e) {
         console.warn('Failed to clear localStorage:', e);
       }

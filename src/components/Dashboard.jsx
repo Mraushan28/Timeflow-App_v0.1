@@ -143,11 +143,8 @@ export default function Dashboard() {
           <div className="text-center py-8" style={{ color: 'var(--color-text-secondary)' }}>
             <p className="text-4xl mb-3">📊</p>
             <p className="text-sm">
-              {selectedWorker === 'All Workers'
-                ? 'No activity tracked yet today.'
-                : `No activity tracked by ${selectedWorker} today.`}
+              No activity logged today. Start a timer to track your time!
             </p>
-            <p className="text-xs mt-1">Go to Tasks tab to start tracking!</p>
           </div>
         )}
       </div>

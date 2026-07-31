@@ -12,7 +12,7 @@ export default function Navbar() {
   const handleResetAllData = () => {
     resetAllData();
     setShowResetConfirm(false);
-    setToast({ message: 'All data has been reset successfully.', type: 'success', isVisible: true });
+    setToast({ message: 'Application data reset successfully!', type: 'success', isVisible: true });
   };
 
   return (
@@ -39,12 +39,12 @@ export default function Navbar() {
                 {/* Reset All Data Button */}
                 <button
                   onClick={() => setShowResetConfirm(true)}
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  style={{ background: 'var(--color-bg)' }}
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 font-semibold text-xs sm:text-sm transition-all duration-200 hover:scale-105 hover:bg-red-100 dark:hover:bg-red-900/40 hover:shadow-md hover:shadow-red-500/20"
                   aria-label="Reset all data"
                   title="Reset All Data"
                 >
-                  <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 hover:text-red-500" />
+                  <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Reset Data</span>
                 </button>
 
                 {/* Master Active Toggle */}
@@ -87,7 +87,7 @@ export default function Navbar() {
       <ConfirmModal
         isOpen={showResetConfirm}
         title="Reset All Data"
-        message="This will permanently delete all tasks, timer history, and analytics data. This action cannot be undone. Are you sure you want to proceed?"
+        message="Are you sure you want to reset all tracked data and history? All saved logs will be permanently deleted."
         confirmLabel="Yes, Reset Everything"
         onConfirm={handleResetAllData}
         onCancel={() => setShowResetConfirm(false)}

@@ -19,8 +19,8 @@ export default function Toast({ message, type, isVisible, onClose }) {
         <div className="fixed bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-[110] animate-fade-in pointer-events-auto">
             <div
                 className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-md min-w-[280px] sm:min-w-[320px] ${isSuccess
-                        ? 'bg-green-50 dark:bg-green-900/80 border-green-200 dark:border-green-700'
-                        : 'bg-red-50 dark:bg-red-900/80 border-red-200 dark:border-red-700'
+                    ? 'bg-green-50 dark:bg-green-900/80 border-green-200 dark:border-green-700'
+                    : 'bg-red-50 dark:bg-red-900/80 border-red-200 dark:border-red-700'
                     }`}
             >
                 {isSuccess ? (
@@ -38,5 +38,6 @@ export default function Toast({ message, type, isVisible, onClose }) {
                     <FiX className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                 </button>
             </div>
-            );
+        </div>
+    );
 }
