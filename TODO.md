@@ -30,3 +30,33 @@
 
 - [x] 10. Run `npm run build` to confirm no errors
 
+---
+
+# TODO — Navbar Spacing Fix + 30-Day Challenge Gamification
+
+## Implementation
+
+- [x] 11. `src/components/Navbar.jsx`
+  - Fix top navbar layout with `justify-between`: logo far left, action controls far right
+- [x] 12. `src/utils/helpers.js`
+  - Add `getDateKey`, `formatDateKey`
+- [x] 13. `src/index.css`
+  - Add `pop-in`, `shake`, `flame-flicker`, `glow-pulse`, `confetti-burst` animations
+- [x] 14. `src/context/AppContext.jsx`
+  - Add `challenge` state (days, streak, bestStreak, badges, targetHours, targetTasks, startedAt)
+  - Add reducer cases: `START_CHALLENGE`, `COMPLETE_CHALLENGE_DAY`, `MISS_CHALLENGE_DAY`, `RESET_CHALLENGE`
+  - Auto-fill missed days on load via `fillMissedGaps`
+  - Expose `startChallenge`, `completeChallengeDay`, `missChallengeDay`, `resetChallenge`
+- [x] 15. `src/components/Confetti.jsx`
+  - Lightweight CSS confetti celebration component
+- [x] 16. `src/components/Challenge30.jsx`
+  - Daily target creation form
+  - Complete Day Target / Miss Day buttons
+  - Streak counter (🔥), best streak, badges, celebration & penalty screens
+  - 30-day visual grid (green ✅ / red ❌ / today 🎯)
+  - LocalStorage persistence via AppContext
+
+## Verification
+
+- [x] 17. Run `npm run build` to confirm no errors
+

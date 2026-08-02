@@ -194,3 +194,23 @@ export function getReminderMonths(history) {
   return [...keys].sort().reverse();
 }
 
+/**
+ * Get a "YYYY-MM-DD" date key for any Date-like input.
+ */
+export function getDateKey(input) {
+  const d = input ? new Date(input) : new Date();
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Get a human friendly label for a "YYYY-MM-DD" date key.
+ */
+export function formatDateKey(dateKey) {
+  if (!dateKey) return '';
+  const parts = dateKey.split('-').map(Number);
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  if (isNaN(d.getTime())) return dateKey;
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+

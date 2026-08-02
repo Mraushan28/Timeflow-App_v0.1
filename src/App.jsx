@@ -5,10 +5,11 @@ import Dashboard from './components/Dashboard';
 import TaskManager from './components/TaskManager';
 import Analytics from './components/Analytics';
 import ScheduledReminders from './components/ScheduledReminders';
+import Challenge30 from './components/Challenge30';
 import ReminderAlarmManager from './components/ReminderAlarmManager';
 import Footer from './components/Footer';
 import InstallPrompt from './components/InstallPrompt';
-import { FiLayers, FiPieChart, FiClock, FiBell } from 'react-icons/fi';
+import { FiLayers, FiPieChart, FiClock, FiBell, FiZap } from 'react-icons/fi';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -17,6 +18,7 @@ function AppContent() {
     { id: 'dashboard', label: 'Dashboard', icon: FiClock },
     { id: 'tasks', label: 'Tasks', icon: FiLayers },
     { id: 'scheduled', label: 'Scheduled', icon: FiBell },
+    { id: 'challenge', label: '30-Day Challenge', icon: FiZap },
     { id: 'analytics', label: 'Analytics', icon: FiPieChart },
   ];
 
@@ -52,6 +54,7 @@ function AppContent() {
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'tasks' && <TaskManager />}
         {activeTab === 'scheduled' && <ScheduledReminders />}
+        {activeTab === 'challenge' && <Challenge30 />}
         {activeTab === 'analytics' && <Analytics />}
       </main>
 
