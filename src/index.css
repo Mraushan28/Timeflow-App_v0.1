@@ -46,29 +46,19 @@
   }
 
   .btn-primary {
-    @apply px-4 py-2 rounded-xl font-medium text-white transition-all duration-200 
-           bg-gradient-to-r from-primary-500 to-primary-600 
-           hover:from-primary-600 hover:to-primary-700
-           shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/30
-           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply px-4 py-2 rounded-xl font-medium text-white transition-all duration-200 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200
-           bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200
-           hover:bg-slate-200 dark:hover:bg-slate-600
-           active:scale-95;
+    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95;
   }
 
   .btn-danger {
-    @apply px-4 py-2 rounded-xl font-medium text-white transition-all duration-200
-           bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25
-           active:scale-95;
+    @apply px-4 py-2 rounded-xl font-medium text-white transition-all duration-200 bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/25 active:scale-95;
   }
 
   .input-field {
-    @apply w-full px-4 py-2.5 rounded-xl border transition-all duration-200 outline-none
-           bg-transparent;
+    @apply w-full px-4 py-2.5 rounded-xl border transition-all duration-200 outline-none bg-transparent;
     border-color: var(--color-border);
     color: var(--color-text);
   }
@@ -109,9 +99,17 @@
 
 /* Animated gradient for active timer */
 @keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .animate-gradient {
@@ -126,6 +124,7 @@
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -134,4 +133,64 @@
 
 .animate-fade-in {
   animation: fade-in-up 0.4s ease-out;
+}
+
+/* Bell ring animation for the reminder alarm */
+@keyframes ring {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  10% {
+    transform: rotate(14deg);
+  }
+
+  20% {
+    transform: rotate(-14deg);
+  }
+
+  30% {
+    transform: rotate(10deg);
+  }
+
+  40% {
+    transform: rotate(-10deg);
+  }
+
+  50% {
+    transform: rotate(6deg);
+  }
+
+  60% {
+    transform: rotate(-6deg);
+  }
+
+  70% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-ring {
+  animation: ring 1.4s ease-in-out infinite;
+}
+
+/* Pulsing glow for the alert modal */
+@keyframes alert-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+  }
+
+  50% {
+    box-shadow: 0 0 0 14px rgba(239, 68, 68, 0);
+  }
+}
+
+.animate-alert-glow {
+  animation: alert-glow 1.3s ease-in-out infinite;
 }

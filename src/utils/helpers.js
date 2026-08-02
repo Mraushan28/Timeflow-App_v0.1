@@ -112,3 +112,85 @@ export function getMonthSummary(history, tasks, worker = null) {
   return summary;
 }
 
+/**
+ * Format an ISO datetime string into a readable "MMM d, yyyy, h:mm AM/PM".
+ */
+export function formatDateTime(isoString) {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return isoString;
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Format an ISO datetime string into time only "h:mm AM/PM".
+ */
+export function formatTimeOnly(isoString) {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return isoString;
+  return d.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Human readable countdown until a scheduled time.
+ * e.g. "Due now", "Due in 45m", "Due in 2h 30m", "Due in 3d".
+ */
+export function formatCountdown(isoString) {
+  if (!isoString) return '—';
+  const target = new Date(isoString).getTime();
+  if (isNaN(target)) return '—';
+  const diff = target - Date.now();
+  if (diff <= 0) return 'Due now';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `Due in ${mins}m`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return remMins > 0 ? `Due in ${hours}h ${remMins}m` : `Due in ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `Due in ${days}d`;
+}
+
+/**
+ * Get the "YYYY-MM" month key for a Date, ISO string, or the current month.
+ */
+export function getMonthKey(input) {
+  const d = input ? new Date(input) : new Date();
+  if (isNaN(d.getTime())) return getMonthKey();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Format a "YYYY-MM" month key into a human label e.g. "January 2026".
+ */
+export function getMonthLabel(monthKey) {
+  if (!monthKey) return '';
+  const parts = monthKey.split('-');
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (!y || !m) return monthKey;
+  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/**
+ * Get all distinct month keys present in reminder history, newest first.
+ */
+export function getReminderMonths(history) {
+  if (!Array.isArray(history)) return [];
+  const keys = new Set(
+    history
+      .filter(h => h)
+      .map(h => getMonthKey(h.resolvedAt || h.scheduledAt))
+  );
+  return [...keys].sort().reverse();
+}
+

@@ -4,9 +4,11 @@ import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import TaskManager from './components/TaskManager';
 import Analytics from './components/Analytics';
+import ScheduledReminders from './components/ScheduledReminders';
+import ReminderAlarmManager from './components/ReminderAlarmManager';
 import Footer from './components/Footer';
 import InstallPrompt from './components/InstallPrompt';
-import { FiLayers, FiPieChart, FiClock } from 'react-icons/fi';
+import { FiLayers, FiPieChart, FiClock, FiBell } from 'react-icons/fi';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14,6 +16,7 @@ function AppContent() {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: FiClock },
     { id: 'tasks', label: 'Tasks', icon: FiLayers },
+    { id: 'scheduled', label: 'Scheduled', icon: FiBell },
     { id: 'analytics', label: 'Analytics', icon: FiPieChart },
   ];
 
@@ -48,11 +51,15 @@ function AppContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1">
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'tasks' && <TaskManager />}
+        {activeTab === 'scheduled' && <ScheduledReminders />}
         {activeTab === 'analytics' && <Analytics />}
       </main>
 
       {/* Footer */}
       <Footer />
+
+      {/* Global scheduled-reminder alarm manager (fires on any tab) */}
+      <ReminderAlarmManager />
 
       {/* PWA Install Prompt */}
       <InstallPrompt />

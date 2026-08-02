@@ -40,6 +40,8 @@ function createFreshState() {
     theme: 'light',
     appActive: false,
     selectedWorker: 'All Workers',
+    scheduledReminders: [],
+    reminderHistory: [],
   };
 }
 
@@ -95,6 +97,8 @@ function loadState() {
       theme: parsed.theme || 'light',
       appActive: parsed.appActive === true,
       selectedWorker: parsed.selectedWorker || 'All Workers',
+      scheduledReminders: Array.isArray(parsed.scheduledReminders) ? parsed.scheduledReminders : [],
+      reminderHistory: Array.isArray(parsed.reminderHistory) ? parsed.reminderHistory : [],
     };
 
     // Immediately persist the synced state so startTime is fresh
@@ -120,6 +124,8 @@ function saveState(state) {
       activeTimers: state.activeTimers,
       appActive: state.appActive,
       selectedWorker: state.selectedWorker,
+      scheduledReminders: state.scheduledReminders,
+      reminderHistory: state.reminderHistory,
     }));
   } catch (e) {
     console.warn('Failed to save state:', e);
@@ -254,6 +260,61 @@ function appReducer(state, action) {
         },
       };
     }
+    case 'ADD_SCHEDULED_REMINDER': {
+      const newReminder = {
+        id: 'reminder-' + Date.now(),
+        name: action.payload.name,
+        description: action.payload.description || '',
+        scheduledAt: action.payload.scheduledAt,
+        worker: action.payload.worker || '',
+        status: 'PENDING',
+        triggeredAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        scheduledReminders: [...state.scheduledReminders, newReminder],
+      };
+    }
+    case 'DELETE_SCHEDULED_REMINDER': {
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.filter(r => r.id !== action.payload.reminderId),
+      };
+    }
+    case 'TRIGGER_SCHEDULED_REMINDER': {
+      const nowIso = new Date().toISOString();
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.map(r =>
+          r.id === action.payload.reminderId
+            ? { ...r, status: 'TRIGGERED', triggeredAt: nowIso }
+            : r
+        ),
+      };
+    }
+    case 'RESOLVE_SCHEDULED_REMINDER': {
+      const { reminderId, approved } = action.payload;
+      const reminder = state.scheduledReminders.find(r => r.id === reminderId);
+      if (!reminder) return state;
+
+      const resolved = {
+        id: reminder.id,
+        name: reminder.name,
+        description: reminder.description || '',
+        scheduledAt: reminder.scheduledAt,
+        worker: reminder.worker || '',
+        status: approved ? 'APPROVED' : 'REJECTED',
+        resolvedAt: new Date().toISOString(),
+        createdAt: reminder.createdAt,
+      };
+
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.filter(r => r.id !== reminderId),
+        reminderHistory: [...state.reminderHistory, resolved],
+      };
+    }
     default:
       return state;
   }
@@ -304,6 +365,12 @@ export function AppProvider({ children }) {
   const setAlarmActive = useCallback((id) => dispatch({ type: 'SET_ALARM_ACTIVE', payload: { taskId: id } }), []);
   const resetAllData = useCallback(() => dispatch({ type: 'RESET_ALL_DATA' }), []);
 
+  // Scheduled reminders
+  const addScheduledReminder = useCallback((r) => dispatch({ type: 'ADD_SCHEDULED_REMINDER', payload: r }), []);
+  const deleteScheduledReminder = useCallback((id) => dispatch({ type: 'DELETE_SCHEDULED_REMINDER', payload: { reminderId: id } }), []);
+  const triggerScheduledReminder = useCallback((id) => dispatch({ type: 'TRIGGER_SCHEDULED_REMINDER', payload: { reminderId: id } }), []);
+  const resolveScheduledReminder = useCallback((id, approved) => dispatch({ type: 'RESOLVE_SCHEDULED_REMINDER', payload: { reminderId: id, approved } }), []);
+
   const workers = ['All Workers', ...new Set(state.tasks.map(t => t.worker).filter(Boolean))];
 
   const value = {
@@ -313,6 +380,8 @@ export function AppProvider({ children }) {
     startTimer, pauseTimer, resumeTimer, stopTimer,
     dismissAlarm, setAlarmActive,
     resetAllData,
+    addScheduledReminder, deleteScheduledReminder,
+    triggerScheduledReminder, resolveScheduledReminder,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

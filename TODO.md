@@ -1,4 +1,4 @@
-# TODO — Reset All Data + Absolute Zero State
+# TODO — Scheduled Task Reminders & Monthly Status Audit
 
 ## Steps
 
@@ -7,23 +7,26 @@
 
 ## Implementation
 
-- [x] 3. `src/context/AppContext.jsx`
-  - Add `containsMockData()` detection
-  - Auto-clear legacy sample/mock data in `loadState()`
-  - Change `RESET_ALL_DATA` to use `localStorage.clear()`
-- [x] 4. `src/utils/helpers.js`
-  - `formatTimeShort(0)` → `'0h 0m'`
-- [x] 5. `src/components/Dashboard.jsx`
-  - Empty state text → "No activity logged today. Start a timer to track your time!"
-- [x] 6. `src/components/Navbar.jsx`
-  - Prominent labeled Reset button
-  - Updated confirmation modal message
-  - Updated success toast message
-- [x] 7. `src/components/Toast.jsx`
-  - Fix JSX syntax error (unclosed outer div)
+- [x] 3. `src/utils/helpers.js`
+  - Add `formatDateTime`, `formatCountdown`, `getMonthKey`, `getMonthLabel`, `getReminderMonths`
+- [x] 4. `src/context/AppContext.jsx`
+  - Add `scheduledReminders` & `reminderHistory` state fields (fresh state, load normalization, save)
+  - Add reducer cases: `ADD_SCHEDULED_REMINDER`, `DELETE_SCHEDULED_REMINDER`, `TRIGGER_SCHEDULED_REMINDER`, `RESOLVE_SCHEDULED_REMINDER`
+  - Expose new callbacks in context value
+- [x] 5. `src/components/ReminderAlertModal.jsx`
+  - Prominent alert modal with task details + green APPROVED / red REJECTED buttons
+- [x] 6. `src/components/ReminderAlarmManager.jsx`
+  - Global 1s checker that fires due reminders, starts looping alarm, mounts alert modal
+- [x] 7. `src/components/ScheduledReminders.jsx`
+  - Creation form (Task Name, Description, Date & Time, Worker)
+  - Upcoming reminders list with live countdowns
+  - Monthly Status Audit (month selector, stat cards, donut chart, progress bars, history list)
+- [x] 8. `src/App.jsx`
+  - Add "Scheduled" tab + mount `ReminderAlarmManager` globally
+- [x] 9. `src/index.css`
+  - Add `animate-ring` and `animate-alert-glow` keyframes
 
 ## Verification
 
-- [x] 8. Run `npm run build` to confirm no errors
-- [ ] 9. Manual test: reset flow, zero-state metrics, timer tracking
+- [x] 10. Run `npm run build` to confirm no errors
 
