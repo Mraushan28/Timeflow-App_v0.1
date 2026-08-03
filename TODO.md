@@ -1,19 +1,26 @@
-# TODO — Scheduled Alarm Instant Trigger Bug Fix
+# TODO — Multiple Parallel 30-Day Challenges
 
-## Root Cause
-The 1-second scheduler interval in `ReminderAlarmManager.jsx` re-creates the interval
-whenever `scheduledReminders` changes (because the effect depends on it), combined with
-timezone-unclear date/time parsing in `ScheduledReminders.jsx`. This can cause the alarm
-and modal to appear instantly on task creation instead of waiting for the scheduled time.
+## Goal
+Refactor the 30-Day Challenge module to support multiple simultaneous challenges
+(e.g., "DSA Coding Practice", "DBMS Subject Revision", "Daily Exercise"), each with
+its own independent 30-day grid, streak/rewards, daily completion status, and
+monthly analysis chart — without breaking timers, scheduled alarms, or dashboard.
 
 ## Steps
-- [x] 1. Analyze current scheduler/modal/creation logic (read files)
-- [x] 2. Refactor `ReminderAlarmManager.jsx`:
-      - Create interval checker ONCE via a latest-state ref (no re-run on array change)
-      - Compare `Date.now()` vs `new Date(r.scheduledAt).getTime()` each tick
-      - Only promote `status === 'PENDING'` -> `TRIGGERED` when `current >= scheduled`
-- [x] 3. Make `ScheduledReminders.jsx` `handleSubmit` timezone-safe
-      - Build `scheduledAt` from local date+time components explicitly
-      - Confirm it does NOT call the trigger directly
-- [x] 4. Verify no other trigger paths exist (App.jsx mounts manager only)
-- [x] 5. Test: production build passes (npm run build) — scheduler code compiles cleanly
+- [x] 1. Refactor `src/context/AppContext.jsx`:
+      - Replace single `state.challenge` with `state.challenges[]`
+      - Add `id` + `name` to each challenge
+      - New reducer actions: `ADD_CHALLENGE`, `DELETE_CHALLENGE`
+      - Per-challenge actions by `challengeId`: `COMPLETE_CHALLENGE_DAY`, `MISS_CHALLENGE_DAY`, `RESET_CHALLENGE` (reset keeps id/name)
+      - Legacy migration: single `challenge` object -> `challenges[]`
+      - Update context callbacks: `addChallenge`, `deleteChallenge`, etc.
+- [x] 2. Rewrite `src/components/Challenge30.jsx`:
+      - Challenge selector tabs for switching between active challenges
+      - "Add New Challenge" form (name + targets) + cancel when challenges exist
+      - Delete/archive a challenge via confirm modal
+      - Per-challenge streak/stats cards, daily target, badges, 30-day grid
+      - Per-challenge celebration/penalty overlays (keyed by challenge id)
+      - Per-challenge "Monthly Completion Analysis" chart (recharts)
+- [x] 3. Verify nothing else references single-challenge state (Dashboard, Analytics, alarms intact)
+- [x] 4. Test: production build passes (`npm run build`)
+

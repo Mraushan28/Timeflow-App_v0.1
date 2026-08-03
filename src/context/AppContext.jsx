@@ -43,15 +43,18 @@ function createFreshState() {
     selectedWorker: 'All Workers',
     scheduledReminders: [],
     reminderHistory: [],
-    challenge: createFreshChallenge(),
+    challenges: [],
   };
 }
 
 /**
  * Fresh 30-Day Challenge state.
+ * Each challenge is fully independent: own grid, streak, rewards, badges.
  */
 function createFreshChallenge() {
   return {
+    id: 'challenge-' + Date.now(),
+    name: '',
     startedAt: null,
     targetHours: '',
     targetTasks: '',
@@ -60,6 +63,20 @@ function createFreshChallenge() {
     bestStreak: 0,
     badges: [],
     day: 0,
+  };
+}
+
+/**
+ * Reset the stats of a challenge while preserving its identity and targets.
+ * Used by RESET_CHALLENGE so a challenge can be restarted cleanly.
+ */
+function resetChallengeKeepingIdentity(challenge) {
+  return {
+    ...createFreshChallenge(),
+    id: challenge.id,
+    name: challenge.name,
+    targetHours: challenge.targetHours,
+    targetTasks: challenge.targetTasks,
   };
 }
 
@@ -153,6 +170,25 @@ function loadState() {
       return createFreshState();
     }
 
+    // MIGRATION: legacy single `challenge` object -> `challenges[]` array.
+    // Any existing single challenge is moved into the array and keeps its data.
+    const legacyChallenge = parsed.challenge;
+    let challenges = Array.isArray(parsed.challenges) ? parsed.challenges : [];
+    if (legacyChallenge && legacyChallenge.startedAt) {
+      // Avoid duplicating if it was already migrated (id preserved).
+      const legacyId = legacyChallenge.id;
+      const alreadyMigrated = legacyId && challenges.some(c => c.id === legacyId);
+      if (!alreadyMigrated) {
+        const migrated = {
+          ...createFreshChallenge(),
+          ...legacyChallenge,
+          id: legacyId || 'challenge-' + Date.now(),
+          name: legacyChallenge.name || 'My 30-Day Challenge',
+        };
+        challenges = [migrated, ...challenges];
+      }
+    }
+
     // Normalize every field with explicit fallbacks
     const loadedState = {
       tasks: parsed.tasks || [],
@@ -163,14 +199,21 @@ function loadState() {
       selectedWorker: parsed.selectedWorker || 'All Workers',
       scheduledReminders: Array.isArray(parsed.scheduledReminders) ? parsed.scheduledReminders : [],
       reminderHistory: Array.isArray(parsed.reminderHistory) ? parsed.reminderHistory : [],
-      challenge: parsed.challenge || createFreshChallenge(),
+      challenges: challenges.map(c => ({ ...createFreshChallenge(), ...c })),
     };
 
     // Auto-fill missed challenge days (if any gap) and reset streak accordingly
-    if (loadedState.challenge && loadedState.challenge.startedAt) {
-      const { challenge, hadGap } = fillMissedGaps(loadedState.challenge, getTodayKey());
-      loadedState.challenge = hadGap ? { ...challenge, streak: 0 } : challenge;
-    }
+    const todayKey = getTodayKey();
+    let anyGap = false;
+    loadedState.challenges = loadedState.challenges.map(c => {
+      if (!c.startedAt) return c;
+      const { challenge, hadGap } = fillMissedGaps(c, todayKey);
+      if (hadGap) {
+        anyGap = true;
+        return { ...challenge, streak: 0 };
+      }
+      return challenge;
+    });
 
     // Immediately persist the synced state so startTime is fresh
     try {
@@ -197,7 +240,7 @@ function saveState(state) {
       selectedWorker: state.selectedWorker,
       scheduledReminders: state.scheduledReminders,
       reminderHistory: state.reminderHistory,
-      challenge: state.challenge,
+      challenges: state.challenges,
     }));
   } catch (e) {
     console.warn('Failed to save state:', e);
@@ -387,74 +430,80 @@ function appReducer(state, action) {
         reminderHistory: [...state.reminderHistory, resolved],
       };
     }
-    // ---- 30-Day Challenge ----
-    case 'START_CHALLENGE': {
-      const todayKey = getTodayKey();
-      const { challenge, hadGap } = fillMissedGaps(state.challenge, todayKey);
-      if (hadGap) {
-        // Streak was lost due to gap while inactive
-        return {
-          ...state,
-          challenge: { ...challenge, streak: 0 },
-        };
-      }
+    // ---- 30-Day Challenge (multiple parallel challenges) ----
+    case 'ADD_CHALLENGE': {
+      const { name, targetHours, targetTasks, id } = action.payload;
+      const fresh = createFreshChallenge();
+      const newChallenge = {
+        ...fresh,
+        id: id || fresh.id,
+        name: name || 'My 30-Day Challenge',
+        targetHours: targetHours || '',
+        targetTasks: targetTasks || '',
+        startedAt: new Date().toISOString(),
+        day: 1,
+      };
       return {
         ...state,
-        challenge: {
-          ...challenge,
-          startedAt: challenge.startedAt || new Date().toISOString(),
-          targetHours: action.payload.targetHours || challenge.targetHours || '',
-          targetTasks: action.payload.targetTasks || challenge.targetTasks || '',
-          day: 1,
-        },
+        challenges: [...(state.challenges || []), newChallenge],
+      };
+    }
+    case 'DELETE_CHALLENGE': {
+      const { challengeId } = action.payload;
+      return {
+        ...state,
+        challenges: (state.challenges || []).filter(c => c.id !== challengeId),
+      };
+    }
+    case 'START_CHALLENGE': {
+      const { challengeId, name, targetHours, targetTasks } = action.payload;
+      const todayKey = getTodayKey();
+      return {
+        ...state,
+        challenges: (state.challenges || []).map(ch => {
+          if (ch.id !== challengeId) return ch;
+          const { challenge, hadGap } = fillMissedGaps(ch, todayKey);
+          let base = hadGap ? { ...challenge, streak: 0 } : challenge;
+          return {
+            ...base,
+            startedAt: base.startedAt || new Date().toISOString(),
+            name: name || base.name || 'My 30-Day Challenge',
+            targetHours: targetHours || base.targetHours || '',
+            targetTasks: targetTasks || base.targetTasks || '',
+            day: 1,
+          };
+        }),
       };
     }
     case 'COMPLETE_CHALLENGE_DAY': {
+      const { challengeId } = action.payload;
       const todayKey = getTodayKey();
-      const ch = state.challenge || createFreshChallenge();
 
-      // If no challenge is active, start one with defaults
-      if (!ch.startedAt) {
+      const challenges = (state.challenges || []).map(ch => {
+        if (ch.id !== challengeId) return ch;
+
+        // Auto-fill any missed gap days (streak reset)
+        const { challenge, hadGap } = fillMissedGaps(ch, todayKey);
+        let base = challenge;
+        if (hadGap) {
+          base = { ...base, streak: 0 };
+        }
+
+        const dayEntry = base.days[todayKey];
+        if (dayEntry && dayEntry.status === 'completed') {
+          // Already completed today — no double reward
+          return ch;
+        }
+
+        // Count completed days including this one
+        const completedKeys = [...Object.keys(base.days).filter(k => base.days[k].status === 'completed'), todayKey];
+        const newDayNumber = completedKeys.length;
+
+        const newStreak = (base.streak || 0) + 1;
+        const newBestStreak = Math.max(base.bestStreak || 0, newStreak);
+        const newBadges = badgesForStreak(newStreak);
+
         return {
-          ...state,
-          challenge: {
-            ...ch,
-            startedAt: new Date().toISOString(),
-            targetHours: '',
-            targetTasks: '',
-            day: 1,
-            days: { [todayKey]: { status: 'completed', completedAt: new Date().toISOString() } },
-            streak: 1,
-            bestStreak: Math.max(ch.bestStreak || 0, 1),
-            badges: badgesForStreak(1),
-          },
-        };
-      }
-
-      // Auto-fill any missed gap days (streak reset)
-      const { challenge, hadGap } = fillMissedGaps(ch, todayKey);
-      let base = challenge;
-      if (hadGap) {
-        base = { ...base, streak: 0 };
-      }
-
-      const dayEntry = base.days[todayKey];
-      if (dayEntry && dayEntry.status === 'completed') {
-        // Already completed today — no double reward
-        return state;
-      }
-
-      // Count completed days including this one
-      const completedKeys = [...Object.keys(base.days).filter(k => base.days[k].status === 'completed'), todayKey];
-      const newDayNumber = completedKeys.length;
-
-      const newStreak = (base.streak || 0) + 1;
-      const newBestStreak = Math.max(base.bestStreak || 0, newStreak);
-      const newBadges = badgesForStreak(newStreak);
-
-      return {
-        ...state,
-        challenge: {
           ...base,
           day: newDayNumber,
           days: {
@@ -464,32 +513,40 @@ function appReducer(state, action) {
           streak: newStreak,
           bestStreak: newBestStreak,
           badges: newBadges,
-        },
-      };
+        };
+      });
+
+      return { ...state, challenges };
     }
     case 'MISS_CHALLENGE_DAY': {
+      const { challengeId } = action.payload;
       const todayKey = getTodayKey();
-      const ch = state.challenge || createFreshChallenge();
-      const dayEntry = (ch.days || {})[todayKey];
-      // Cannot miss a day that is already completed
-      if (dayEntry && dayEntry.status === 'completed') return state;
 
-      return {
-        ...state,
-        challenge: {
+      const challenges = (state.challenges || []).map(ch => {
+        if (ch.id !== challengeId) return ch;
+        const dayEntry = (ch.days || {})[todayKey];
+        // Cannot miss a day that is already completed
+        if (dayEntry && dayEntry.status === 'completed') return ch;
+
+        return {
           ...ch,
           days: {
             ...(ch.days || {}),
             [todayKey]: { status: 'missed', missedAt: new Date().toISOString() },
           },
           streak: 0,
-        },
-      };
+        };
+      });
+
+      return { ...state, challenges };
     }
     case 'RESET_CHALLENGE': {
+      const { challengeId } = action.payload;
       return {
         ...state,
-        challenge: createFreshChallenge(),
+        challenges: (state.challenges || []).map(ch =>
+          ch.id === challengeId ? resetChallengeKeepingIdentity(ch) : ch
+        ),
       };
     }
     default:
@@ -548,11 +605,19 @@ export function AppProvider({ children }) {
   const triggerScheduledReminder = useCallback((id) => dispatch({ type: 'TRIGGER_SCHEDULED_REMINDER', payload: { reminderId: id } }), []);
   const resolveScheduledReminder = useCallback((id, approved) => dispatch({ type: 'RESOLVE_SCHEDULED_REMINDER', payload: { reminderId: id, approved } }), []);
 
-  // 30-Day Challenge
-  const startChallenge = useCallback((targets) => dispatch({ type: 'START_CHALLENGE', payload: targets }), []);
-  const completeChallengeDay = useCallback(() => dispatch({ type: 'COMPLETE_CHALLENGE_DAY' }), []);
-  const missChallengeDay = useCallback(() => dispatch({ type: 'MISS_CHALLENGE_DAY' }), []);
-  const resetChallenge = useCallback(() => dispatch({ type: 'RESET_CHALLENGE' }), []);
+  // 30-Day Challenge (multiple parallel challenges)
+  const addChallenge = useCallback((name, targetHours, targetTasks, id) =>
+    dispatch({ type: 'ADD_CHALLENGE', payload: { name, targetHours, targetTasks, id } }), []);
+  const deleteChallenge = useCallback((challengeId) =>
+    dispatch({ type: 'DELETE_CHALLENGE', payload: { challengeId } }), []);
+  const startChallenge = useCallback((challengeId, name, targetHours, targetTasks) =>
+    dispatch({ type: 'START_CHALLENGE', payload: { challengeId, name, targetHours, targetTasks } }), []);
+  const completeChallengeDay = useCallback((challengeId) =>
+    dispatch({ type: 'COMPLETE_CHALLENGE_DAY', payload: { challengeId } }), []);
+  const missChallengeDay = useCallback((challengeId) =>
+    dispatch({ type: 'MISS_CHALLENGE_DAY', payload: { challengeId } }), []);
+  const resetChallenge = useCallback((challengeId) =>
+    dispatch({ type: 'RESET_CHALLENGE', payload: { challengeId } }), []);
 
   const workers = ['All Workers', ...new Set(state.tasks.map(t => t.worker).filter(Boolean))];
 
@@ -565,7 +630,7 @@ export function AppProvider({ children }) {
     resetAllData,
     addScheduledReminder, deleteScheduledReminder,
     triggerScheduledReminder, resolveScheduledReminder,
-    startChallenge, completeChallengeDay, missChallengeDay, resetChallenge,
+    addChallenge, deleteChallenge, startChallenge, completeChallengeDay, missChallengeDay, resetChallenge,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
