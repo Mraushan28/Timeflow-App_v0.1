@@ -84,9 +84,19 @@ export default function ScheduledReminders() {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!form.name.trim() || !form.date || !form.time) return;
-        const scheduledAt = new Date(`${form.date}T${form.time}`);
+
+        // Build the target timestamp from the user's LOCAL date + time parts.
+        // The string form `YYYY-MM-DDTHH:mm` is interpreted as local time, and
+        // `.toISOString()` stores it as an unambiguous UTC instant. This avoids
+        // timezone offset mismatches when the scheduler compares it with Date.now().
+        const [yr, mo, dy] = form.date.split('-').map(Number);
+        const [hh, mm] = form.time.split(':').map(Number);
+        const scheduledAt = new Date(yr, mo - 1, dy, hh, mm, 0, 0);
         if (isNaN(scheduledAt.getTime())) return;
 
+        // Note: we intentionally do NOT call the trigger here — the reminder is
+        // created in PENDING state and only fires via the global interval checker
+        // once the scheduled time is reached.
         addScheduledReminder({
             name: form.name.trim(),
             description: form.description.trim(),

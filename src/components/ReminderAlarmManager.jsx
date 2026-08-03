@@ -15,6 +15,12 @@ export default function ReminderAlarmManager() {
     const { state, triggerScheduledReminder, resolveScheduledReminder } = useApp();
     const [activeReminder, setActiveReminder] = useState(null);
     const stopAlarmRef = useRef(null);
+    // Always-point-to-latest-state ref so the interval is created ONCE and never
+    // re-initialized (or fired immediately) when `scheduledReminders` changes.
+    const stateRef = useRef(state);
+    stateRef.current = state;
+    const triggerRef = useRef(triggerScheduledReminder);
+    triggerRef.current = triggerScheduledReminder;
 
     // Find the first triggered-but-unresolved reminder (the one ringing now)
     const triggered = state.scheduledReminders.find(r => r.status === 'TRIGGERED');
@@ -53,19 +59,23 @@ export default function ReminderAlarmManager() {
         };
     }, [triggered]);
 
-    // 1-second checker: promote any PENDING reminder whose time has arrived
+    // 1-second checker: promote any PENDING reminder whose time has arrived.
+    // Created ONCE (empty deps) and reads the latest state via refs, so adding a
+    // new reminder never re-runs this effect or fires an immediate check — the
+    // alarm only triggers on a real tick once `currentTimestamp >= scheduledTimestamp`.
     useEffect(() => {
         const checkInterval = setInterval(() => {
-            const now = Date.now();
-            state.scheduledReminders.forEach(r => {
-                if (r.status === 'PENDING' && new Date(r.scheduledAt).getTime() <= now) {
-                    triggerScheduledReminder(r.id);
+            const currentTimestamp = Date.now();
+            stateRef.current.scheduledReminders.forEach(r => {
+                if (r.status === 'PENDING' && currentTimestamp >= new Date(r.scheduledAt).getTime()) {
+                    triggerRef.current(r.id);
                 }
             });
         }, 1000);
 
         return () => clearInterval(checkInterval);
-    }, [state.scheduledReminders, triggerScheduledReminder]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Resolve handler — stops alarm and records APPROVED/REJECTED in history
     const handleResolve = useCallback((approved) => {
