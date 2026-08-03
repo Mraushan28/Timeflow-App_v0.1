@@ -55,6 +55,7 @@ function createFreshChallenge() {
   return {
     id: 'challenge-' + Date.now(),
     name: '',
+    description: '',
     startedAt: null,
     targetHours: '',
     targetTasks: '',
@@ -75,6 +76,7 @@ function resetChallengeKeepingIdentity(challenge) {
     ...createFreshChallenge(),
     id: challenge.id,
     name: challenge.name,
+    description: challenge.description || '',
     targetHours: challenge.targetHours,
     targetTasks: challenge.targetTasks,
   };
@@ -432,12 +434,13 @@ function appReducer(state, action) {
     }
     // ---- 30-Day Challenge (multiple parallel challenges) ----
     case 'ADD_CHALLENGE': {
-      const { name, targetHours, targetTasks, id } = action.payload;
+      const { name, targetHours, targetTasks, description, id } = action.payload;
       const fresh = createFreshChallenge();
       const newChallenge = {
         ...fresh,
         id: id || fresh.id,
         name: name || 'My 30-Day Challenge',
+        description: description || '',
         targetHours: targetHours || '',
         targetTasks: targetTasks || '',
         startedAt: new Date().toISOString(),
@@ -606,8 +609,8 @@ export function AppProvider({ children }) {
   const resolveScheduledReminder = useCallback((id, approved) => dispatch({ type: 'RESOLVE_SCHEDULED_REMINDER', payload: { reminderId: id, approved } }), []);
 
   // 30-Day Challenge (multiple parallel challenges)
-  const addChallenge = useCallback((name, targetHours, targetTasks, id) =>
-    dispatch({ type: 'ADD_CHALLENGE', payload: { name, targetHours, targetTasks, id } }), []);
+  const addChallenge = useCallback((name, targetHours, targetTasks, id, description) =>
+    dispatch({ type: 'ADD_CHALLENGE', payload: { name, targetHours, targetTasks, id, description } }), []);
   const deleteChallenge = useCallback((challengeId) =>
     dispatch({ type: 'DELETE_CHALLENGE', payload: { challengeId } }), []);
   const startChallenge = useCallback((challengeId, name, targetHours, targetTasks) =>

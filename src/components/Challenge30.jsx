@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import {
     FiTarget, FiCheckCircle, FiXCircle, FiStar, FiZap,
     FiCalendar, FiFlag, FiAward, FiRotateCcw, FiClock,
-    FiPlus, FiTrash2, FiFolder,
+    FiPlus, FiTrash2, FiFolder, FiMessageSquare, FiX,
 } from 'react-icons/fi';
 import { getDateKey, formatDateKey } from '../utils/helpers';
 import Confetti from './Confetti';
@@ -20,14 +20,14 @@ const TOTAL_DAYS = 30;
  */
 function buildDayGrid(challenge) {
     const grid = [];
-    const start = challenge.startedAt ? new Date(challenge.startedAt) : new Date();
+    const start = challenge && challenge.startedAt ? new Date(challenge.startedAt) : new Date();
     const todayKey = getDateKey();
 
     for (let i = 0; i < TOTAL_DAYS; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
         const dateKey = getDateKey(d);
-        const entry = (challenge.days || {})[dateKey];
+        const entry = (challenge && challenge.days ? challenge.days[dateKey] : null);
         grid.push({
             dateKey,
             dayNumber: i + 1,
@@ -89,10 +89,14 @@ export default function Challenge30() {
     const challenges = state.challenges || [];
 
     const [activeChallengeId, setActiveChallengeId] = useState(challenges[0]?.id || null);
-    const [showSetup, setShowSetup] = useState(false);
+
+    // Create-challenge modal state (robust `isCreating` boolean guard)
+    const [isCreating, setIsCreating] = useState(false);
     const [newName, setNewName] = useState('');
-    const [targetHours, setTargetHours] = useState('');
-    const [targetTasks, setTargetTasks] = useState('');
+    const [newHours, setNewHours] = useState('');
+    const [newTasks, setNewTasks] = useState('');
+    const [newDescription, setNewDescription] = useState('');
+
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [resetTargetId, setResetTargetId] = useState(null);
     const [celebratingId, setCelebratingId] = useState(null);
@@ -116,8 +120,8 @@ export default function Challenge30() {
     const isMissedToday = todayEntry?.status === 'missed';
 
     const grid = useMemo(() => challenge ? buildDayGrid(challenge) : [], [challenge]);
-    const completedCount = grid.filter(d => d.status === 'completed').length;
-    const missedCount = grid.filter(d => d.status === 'missed').length;
+    const completedCount = (grid || []).filter(d => d.status === 'completed').length;
+    const missedCount = (grid || []).filter(d => d.status === 'missed').length;
     const progressPct = challenge ? Math.round((completedCount / TOTAL_DAYS) * 100) : 0;
     const chartData = useMemo(() => challenge ? buildMonthlyChartData(challenge) : [], [challenge]);
 
@@ -155,15 +159,28 @@ export default function Challenge30() {
         return () => clearTimeout(t);
     }, [challenge, justCompletedIds]);
 
-    const handleAddChallenge = (e) => {
+    const openCreateModal = () => {
+        setNewName('');
+        setNewHours('');
+        setNewTasks('');
+        setNewDescription('');
+        setIsCreating(true);
+    };
+
+    const closeCreateModal = () => {
+        setIsCreating(false);
+    };
+
+    const handleSaveChallenge = (e) => {
         e.preventDefault();
         const name = newName.trim() || 'My 30-Day Challenge';
         const id = 'challenge-' + Date.now();
-        addChallenge(name, targetHours.trim(), targetTasks.trim(), id);
-        setShowSetup(false);
+        addChallenge(name, newHours.trim(), newTasks.trim(), id, newDescription.trim());
+        setIsCreating(false);
         setNewName('');
-        setTargetHours('');
-        setTargetTasks('');
+        setNewHours('');
+        setNewTasks('');
+        setNewDescription('');
         setActiveChallengeId(id);
     };
 
@@ -201,18 +218,18 @@ export default function Challenge30() {
             </div>
             {challenges.length > 0 && (
                 <button
-                    onClick={() => setShowSetup(true)}
+                    onClick={openCreateModal}
                     className="btn-primary flex items-center gap-2"
                 >
                     <FiPlus className="w-4 h-4" />
-                    {challenges.length === 0 ? 'Create Challenge' : 'Add New Challenge'}
+                    Add New Challenge
                 </button>
             )}
         </div>
     );
 
     const renderChallengeSelector = () => {
-        if (challenges.length === 0) return null;
+        if (!challenges || challenges.length === 0) return null;
         return (
             <div className="flex flex-wrap items-center gap-2">
                 {challenges.map(c => (
@@ -220,8 +237,8 @@ export default function Challenge30() {
                         key={c.id}
                         onClick={() => setActiveChallengeId(c.id)}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${c.id === activeChallengeId
-                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25'
-                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25'
+                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                             }`}
                     >
                         <FiFolder className="w-4 h-4" />
@@ -238,71 +255,85 @@ export default function Challenge30() {
         );
     };
 
-    const renderSetupForm = () => (
-        <div className="card">
-            <div className="text-center py-6">
-                <div className="text-6xl mb-4">🎯</div>
-                <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>
-                    {challenges.length === 0 ? 'Start Your 30-Day Challenge' : 'Add a New 30-Day Challenge'}
-                </h3>
-                <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: 'var(--color-text-secondary)' }}>
-                    Give your challenge a name and define its daily target. Each challenge tracks its own
-                    grid, streak, badges, and history — so you can run them all in parallel.
-                </p>
-
-                <form onSubmit={handleAddChallenge} className="max-w-md mx-auto space-y-4 text-left">
-                    <div>
-                        <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                            Challenge Name (e.g., DSA Coding Practice)
-                        </label>
-                        <input
-                            type="text"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            placeholder="e.g., DSA Coding Practice"
-                            className="input-field"
-                            autoFocus
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                            Daily Target Hours (e.g., 4h)
-                        </label>
-                        <input
-                            type="text"
-                            value={targetHours}
-                            onChange={(e) => setTargetHours(e.target.value)}
-                            placeholder="e.g., 4h"
-                            className="input-field"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                            Daily Target Tasks (e.g., DSA + DBMS)
-                        </label>
-                        <input
-                            type="text"
-                            value={targetTasks}
-                            onChange={(e) => setTargetTasks(e.target.value)}
-                            placeholder="e.g., DSA + DBMS"
-                            className="input-field"
-                        />
-                    </div>
-                    <div className="flex gap-3">
-                        <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
-                            <FiTarget className="w-4 h-4" />
-                            {challenges.length === 0 ? 'Create Challenge' : 'Add Challenge'}
+    const renderCreateModal = () => {
+        if (!isCreating) return null;
+        return (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeCreateModal} />
+                <div
+                    className="relative w-full max-w-md rounded-2xl shadow-2xl animate-fade-in overflow-hidden"
+                    style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                >
+                    <div className="flex items-center justify-between px-6 pt-6 pb-2">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
+                                <FiFlag className="w-5 h-5 text-white" />
+                            </div>
+                            <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+                                {challenges.length === 0 ? 'Create Your First Challenge' : 'Add New Challenge'}
+                            </h3>
+                        </div>
+                        <button
+                            onClick={closeCreateModal}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            style={{ color: 'var(--color-text-secondary)' }}
+                        >
+                            <FiX className="w-5 h-5" />
                         </button>
-                        {challenges.length > 0 && (
-                            <button type="button" onClick={() => setShowSetup(false)} className="btn-secondary px-5">
+                    </div>
+
+                    <form onSubmit={handleSaveChallenge} className="px-6 py-4 space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                                Challenge Title
+                            </label>
+                            <input
+                                type="text"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="e.g., DBMS 30-Day Sprint"
+                                className="input-field"
+                                autoFocus
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                                Daily Hours / Target Goal
+                            </label>
+                            <input
+                                type="text"
+                                value={newHours}
+                                onChange={(e) => setNewHours(e.target.value)}
+                                placeholder="e.g., 3 hours"
+                                className="input-field"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                                Target Description / Note
+                            </label>
+                            <textarea
+                                value={newDescription}
+                                onChange={(e) => setNewDescription(e.target.value)}
+                                placeholder="e.g., Complete 1 topic per day"
+                                className="input-field"
+                                rows={2}
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <button type="button" onClick={closeCreateModal} className="btn-secondary px-5 py-2.5 text-sm">
                                 Cancel
                             </button>
-                        )}
-                    </div>
-                </form>
+                            <button type="submit" className="btn-primary px-5 py-2.5 text-sm flex items-center gap-2">
+                                <FiTarget className="w-4 h-4" />
+                                Save Challenge
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderEmptyState = () => (
         <div className="card">
@@ -315,17 +346,13 @@ export default function Challenge30() {
                     Define your daily target, complete it each day to grow your streak, and earn badges.
                     Miss a day and your streak resets to zero! You can run multiple challenges in parallel.
                 </p>
-                {!showSetup ? (
-                    <button
-                        onClick={() => setShowSetup(true)}
-                        className="btn-primary flex items-center gap-2 mx-auto"
-                    >
-                        <FiFlag className="w-4 h-4" />
-                        Create Your First Challenge
-                    </button>
-                ) : (
-                    renderSetupForm()
-                )}
+                <button
+                    onClick={openCreateModal}
+                    className="btn-primary flex items-center gap-2 mx-auto"
+                >
+                    <FiFlag className="w-4 h-4" />
+                    Create Your First Challenge
+                </button>
             </div>
         </div>
     );
@@ -428,6 +455,16 @@ export default function Challenge30() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Description / note */}
+                    {challenge.description && (
+                        <div className="flex items-start gap-2 mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                            <FiMessageSquare className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                                {challenge.description}
+                            </p>
+                        </div>
+                    )}
 
                     {/* Progress bar */}
                     <div className="mb-4">
@@ -565,7 +602,7 @@ export default function Challenge30() {
                     </div>
 
                     <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-10 gap-2.5">
-                        {grid.map(d => {
+                        {(grid || []).map(d => {
                             const isCompleted = d.status === 'completed';
                             const isMissed = d.status === 'missed';
                             return (
@@ -690,7 +727,7 @@ export default function Challenge30() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            {showSetup && challenges.length === 0 ? null : renderChallengeHeader()}
+            {renderChallengeHeader()}
 
             {/* Confetti / Celebration overlay */}
             {celebratingId && <Confetti count={70} triggerKey={celebrationKeys[celebratingId] || 0} />}
@@ -721,14 +758,11 @@ export default function Challenge30() {
                 </div>
             )}
 
-            {/* Setup form (add new) */}
-            {showSetup && challenges.length > 0 && renderSetupForm()}
-
             {/* Challenge Selector / Tabbed view */}
             {challenges.length > 0 && renderChallengeSelector()}
 
             {/* No challenges yet */}
-            {challenges.length === 0 && !showSetup && renderEmptyState()}
+            {challenges.length === 0 && renderEmptyState()}
 
             {/* Active challenge detail view */}
             {challenges.length > 0 && challenge && (
@@ -736,6 +770,9 @@ export default function Challenge30() {
                     {renderChallengeView()}
                 </div>
             )}
+
+            {/* Create Challenge Modal */}
+            {renderCreateModal()}
 
             {/* Confirm modals */}
             <ConfirmModal
@@ -759,4 +796,3 @@ export default function Challenge30() {
         </div>
     );
 }
-

@@ -23,4 +23,11 @@ monthly analysis chart — without breaking timers, scheduled alarms, or dashboa
       - Per-challenge "Monthly Completion Analysis" chart (recharts)
 - [x] 3. Verify nothing else references single-challenge state (Dashboard, Analytics, alarms intact)
 - [x] 4. Test: production build passes (`npm run build`)
+- [x] 5. CRITICAL BUG FIX (blank screen on "Create Challenge"):
+      - Replaced brittle inline form toggle with a robust `isCreating` boolean state
+      - Created a dedicated modal popup for challenge creation (title, hours, description, Save/Cancel)
+      - Added safe array fallbacks `(challenges || [])` and `challenge?` guards everywhere
+      - Modal always renders a valid overlay; header/empty-state always render correctly
+      - Added `description` field support to challenge data model + reducer + callback
+      - On save: appends to `challenges[]`, persists to localStorage, closes modal, switches to new challenge
 
