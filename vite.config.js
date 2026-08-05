@@ -39,10 +39,17 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['vite.svg', 'pwa-192x192.svg', 'pwa-512x512.svg'],
+      includeAssets: [
+        'vite.svg',
+        'pwa-192x192.svg',
+        'pwa-512x512.svg',
+        'robots.txt',
+        'sitemap.xml',
+      ],
       manifest,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff2,txt,xml}'],
+        navigateFallbackDenylist: [/^\/robots\.txt$/, /^\/sitemap\.xml$/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -77,4 +84,3 @@ export default defineConfig({
     }),
   ],
 });
-
