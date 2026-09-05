@@ -14,22 +14,34 @@ const manifest = {
   start_url: '/',
   icons: [
     {
+      src: '/icons/icon-192.png',
+      sizes: '192x192',
+      type: 'image/png',
+      purpose: 'any',
+    },
+    {
+      src: '/icons/icon-512.png',
+      sizes: '512x512',
+      type: 'image/png',
+      purpose: 'any',
+    },
+    {
+      src: '/icons/icon-maskable-512.png',
+      sizes: '512x512',
+      type: 'image/png',
+      purpose: 'maskable',
+    },
+    {
       src: '/pwa-192x192.svg',
       sizes: '192x192',
       type: 'image/svg+xml',
-      purpose: 'any maskable',
+      purpose: 'any',
     },
     {
       src: '/pwa-512x512.svg',
       sizes: '512x512',
       type: 'image/svg+xml',
-      purpose: 'any maskable',
-    },
-    {
-      src: '/pwa-512x512.svg',
-      sizes: '512x512',
-      type: 'image/svg+xml',
-      purpose: 'maskable',
+      purpose: 'any',
     },
   ],
 };
@@ -41,6 +53,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: [
         'vite.svg',
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'icons/icon-maskable-512.png',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
         'pwa-192x192.svg',
         'pwa-512x512.svg',
         'robots.txt',
@@ -50,7 +67,7 @@ export default defineConfig({
       manifest,
       workbox: {
         importScripts: ['/sw-custom.js'],
-        globPatterns: ['**/*.{js,css,html,ico,svg,woff2,txt,xml}'],
+        globPatterns: ['**/*.{js,css,html,ico,svg,png,woff2,txt,xml}'],
         navigateFallbackDenylist: [/^\/robots\.txt$/, /^\/sitemap\.xml$/],
         runtimeCaching: [
           {

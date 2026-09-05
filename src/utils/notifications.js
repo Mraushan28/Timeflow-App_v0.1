@@ -55,8 +55,8 @@ export async function sendNotification(title, options = {}) {
   }
 
   const notificationOptions = {
-    icon: '/pwa-192x192.svg',
-    badge: '/pwa-192x192.svg',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
     vibrate: [200, 100, 200],
     requireInteraction: false,
     ...options,
