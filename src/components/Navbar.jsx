@@ -6,6 +6,7 @@ import Toast from './Toast';
 import NotificationCenterModal from './NotificationCenterModal';
 import BackupSyncModal from './BackupSyncModal';
 import { SYNC_STATUS } from '../utils/syncService';
+import TimeFlowLogo from './TimeFlowLogo';
 
 export default function Navbar() {
   const { state, authUser, syncStatus, toggleTheme, toggleAppActive, resetAllData, resetAllDataWithCloud } = useApp();
@@ -42,9 +43,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between gap-2 sm:gap-4 h-14 sm:h-16">
             {/* Left: App Logo & Name */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/25 flex-shrink-0">
-                <FiBarChart2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              </div>
+              <TimeFlowLogo className="w-8 h-8 sm:w-10 sm:h-10" iconSize="w-4 h-4 sm:w-5 sm:h-5" />
               <div className="min-w-0">
                 <h1 className="text-base sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--color-text)' }}>
                   TimeFlow
@@ -97,14 +96,14 @@ export default function Navbar() {
                 {authUser && (
                   <span
                     className={`absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${syncStatus === SYNC_STATUS.SYNCED
-                        ? 'bg-green-500'
-                        : syncStatus === SYNC_STATUS.SYNCING
-                          ? 'bg-blue-500 animate-pulse'
-                          : syncStatus === SYNC_STATUS.OFFLINE
-                            ? 'bg-amber-500'
-                            : syncStatus === SYNC_STATUS.ERROR
-                              ? 'bg-red-500'
-                              : 'bg-slate-400'
+                      ? 'bg-green-500'
+                      : syncStatus === SYNC_STATUS.SYNCING
+                        ? 'bg-blue-500 animate-pulse'
+                        : syncStatus === SYNC_STATUS.OFFLINE
+                          ? 'bg-amber-500'
+                          : syncStatus === SYNC_STATUS.ERROR
+                            ? 'bg-red-500'
+                            : 'bg-slate-400'
                       }`}
                   />
                 )}

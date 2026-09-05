@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiBarChart2 } from 'react-icons/fi';
+import TimeFlowLogo from './TimeFlowLogo';
 
 export default function Footer() {
   return (
@@ -14,9 +14,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
-              <FiBarChart2 className="w-4 h-4 text-white" />
-            </div>
+            <TimeFlowLogo className="w-8 h-8" iconSize="w-4 h-4" />
             <div>
               <p className="text-sm font-semibold text-white">TimeFlow</p>
               <p className="text-xs text-slate-400">Time Management & Audit</p>
