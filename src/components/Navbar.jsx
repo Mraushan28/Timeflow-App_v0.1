@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { FiSun, FiMoon, FiBarChart2, FiPower, FiTrash2 } from 'react-icons/fi';
+import { FiSun, FiMoon, FiBarChart2, FiPower, FiTrash2, FiBell } from 'react-icons/fi';
 import ConfirmModal from './ConfirmModal';
 import Toast from './Toast';
+import NotificationCenterModal from './NotificationCenterModal';
 
 export default function Navbar() {
   const { state, toggleTheme, toggleAppActive, resetAllData } = useApp();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const [toast, setToast] = useState({ message: '', type: 'success', isVisible: false });
+
+  const activeRemindersCount = (state.scheduledReminders || []).filter(r => r.status === 'PENDING' && r.isEnabled !== false).length;
 
   const handleResetAllData = () => {
     resetAllData();
@@ -66,6 +70,22 @@ export default function Navbar() {
                 </button>
               </div>
 
+              {/* Notification Center Button */}
+              <button
+                onClick={() => setShowNotificationCenter(true)}
+                className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 flex-shrink-0"
+                style={{ background: 'var(--color-bg)' }}
+                aria-label="Notifications and reminder settings"
+                title="Notifications & Reminders"
+              >
+                <FiBell className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-300" />
+                {activeRemindersCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary-500 text-white text-[10px] sm:text-xs font-bold flex items-center justify-center shadow-md animate-pulse">
+                    {activeRemindersCount > 9 ? '9+' : activeRemindersCount}
+                  </span>
+                )}
+              </button>
+
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
@@ -83,6 +103,12 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
+
+      {/* Notification Center Modal */}
+      <NotificationCenterModal
+        isOpen={showNotificationCenter}
+        onClose={() => setShowNotificationCenter(false)}
+      />
 
       {/* Reset Confirmation Modal */}
       <ConfirmModal

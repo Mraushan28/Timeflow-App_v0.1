@@ -8,28 +8,37 @@ import {
     getMonthKey, getMonthLabel, getReminderMonths,
 } from '../utils/helpers';
 import {
+    getNotificationPermission, requestNotificationPermission,
+    ADVANCE_NOTICE_OPTIONS, formatAdvanceNotice,
+} from '../utils/notifications';
+import TaskReminderModal from './TaskReminderModal';
+import {
     FiPlus, FiX, FiSave, FiBell, FiTrash2, FiCalendar,
     FiUser, FiCheckCircle, FiXCircle, FiBarChart2, FiClock,
+    FiEdit2, FiAlertCircle,
 } from 'react-icons/fi';
 
 /**
  * Scheduled Task Reminders & Monthly Status Audit.
- *  - Creation form (Task Name, Description, Schedule Date & Time, Worker)
- *  - Upcoming scheduled reminders with live countdown
+ *  - Creation form (Task Name, Description, Schedule Date & Time, Worker, Advance Notice)
+ *  - Upcoming scheduled reminders with live countdown and active/muted controls
  *  - Monthly Status Audit: totals, approved/rejected %, donut chart, history list
  */
 export default function ScheduledReminders() {
     const {
-        state, addScheduledReminder, deleteScheduledReminder,
+        state, addScheduledReminder, deleteScheduledReminder, toggleScheduledReminder,
     } = useApp();
 
     const [showForm, setShowForm] = useState(false);
+    const [editingReminder, setEditingReminder] = useState(null);
+    const [permission, setPermission] = useState(getNotificationPermission());
     const [form, setForm] = useState({
         name: '',
         description: '',
         date: '',
         time: '',
         worker: '',
+        advanceNotice: 5,
     });
     const [now, setNow] = useState(Date.now());
     const [selectedMonth, setSelectedMonth] = useState(getMonthKey());
@@ -101,10 +110,12 @@ export default function ScheduledReminders() {
             name: form.name.trim(),
             description: form.description.trim(),
             scheduledAt: scheduledAt.toISOString(),
+            advanceNotice: Number(form.advanceNotice) || 0,
             worker: form.worker.trim(),
+            isEnabled: true,
         });
 
-        setForm({ name: '', description: '', date: '', time: '', worker: '' });
+        setForm({ name: '', description: '', date: '', time: '', worker: '', advanceNotice: 5 });
         setShowForm(false);
     };
 
@@ -130,6 +141,35 @@ export default function ScheduledReminders() {
                     {showForm ? 'Cancel' : 'New Reminder'}
                 </button>
             </div>
+
+            {/* Notification Permission Banner if not enabled */}
+            {permission !== 'granted' && (
+                <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-primary-500/20 bg-gradient-to-r from-primary-500/5 via-purple-500/5 to-transparent">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-500 flex-shrink-0">
+                            <FiBell className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                                Enable Native Reminders
+                            </p>
+                            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                                Receive system notifications and alarms when tasks are due, even in the background.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            const res = await requestNotificationPermission();
+                            setPermission(res);
+                        }}
+                        className="btn-primary text-xs py-2 px-4 flex items-center justify-center gap-1.5 whitespace-nowrap self-start sm:self-center"
+                    >
+                        <FiBell className="w-3.5 h-3.5" />
+                        Enable Notifications
+                    </button>
+                </div>
+            )}
 
             {/* Creation Form */}
             {showForm && (
@@ -190,7 +230,21 @@ export default function ScheduledReminders() {
                                     required
                                 />
                             </div>
-                            <div className="sm:col-span-2">
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                                    Early Warning Notice
+                                </label>
+                                <select
+                                    value={form.advanceNotice}
+                                    onChange={(e) => setForm({ ...form, advanceNotice: Number(e.target.value) })}
+                                    className="input-field cursor-pointer"
+                                >
+                                    {ADVANCE_NOTICE_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
                                     Worker Name (optional)
                                 </label>
@@ -247,17 +301,30 @@ export default function ScheduledReminders() {
                         {upcoming.map(r => {
                             const dueIn = formatCountdown(r.scheduledAt);
                             const isSoon = new Date(r.scheduledAt).getTime() - now <= 5 * 60 * 1000;
+                            const isMuted = r.isEnabled === false;
                             return (
-                                <div key={r.id} className="p-4 rounded-2xl" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                                <div
+                                    key={r.id}
+                                    className={`p-4 rounded-2xl transition-all border ${isMuted ? 'opacity-60 bg-slate-50 dark:bg-slate-800/30' : ''
+                                        }`}
+                                    style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
+                                >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className={'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ' + (isSoon ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-primary-100 dark:bg-primary-900/30')}>
-                                                <FiBell className={'w-5 h-5 ' + (isSoon ? 'text-amber-500' : 'text-primary-500')} />
+                                            <div className={'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ' + (isSoon && !isMuted ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-primary-100 dark:bg-primary-900/30')}>
+                                                <FiBell className={'w-5 h-5 ' + (isSoon && !isMuted ? 'text-amber-500' : 'text-primary-500')} />
                                             </div>
                                             <div className="min-w-0">
-                                                <h4 className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>
-                                                    {r.name}
-                                                </h4>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className={`text-sm font-semibold truncate ${isMuted ? 'line-through' : ''}`} style={{ color: 'var(--color-text)' }}>
+                                                        {r.name}
+                                                    </h4>
+                                                    {isMuted && (
+                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500">
+                                                            Muted
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {r.worker && (
                                                     <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
                                                         <FiUser className="w-3 h-3" /> {r.worker}
@@ -265,13 +332,33 @@ export default function ScheduledReminders() {
                                                 )}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => deleteScheduledReminder(r.id)}
-                                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition-colors"
-                                            title="Delete reminder"
-                                        >
-                                            <FiTrash2 className="w-4 h-4" />
-                                        </button>
+
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            <button
+                                                onClick={() => toggleScheduledReminder(r.id)}
+                                                className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${isMuted
+                                                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300'
+                                                        : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200'
+                                                    }`}
+                                                title={isMuted ? 'Enable alert' : 'Mute alert'}
+                                            >
+                                                {isMuted ? 'Muted' : 'Active'}
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingReminder(r)}
+                                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                                title="Edit reminder"
+                                            >
+                                                <FiEdit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => deleteScheduledReminder(r.id)}
+                                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition-colors"
+                                                title="Delete reminder"
+                                            >
+                                                <FiTrash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {r.description && (
@@ -281,11 +368,19 @@ export default function ScheduledReminders() {
                                     )}
 
                                     <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
-                                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                            <FiCalendar className="w-3 h-3" />
-                                            {formatDateTime(r.scheduledAt)}
-                                        </span>
-                                        <span className={'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ' + (isSoon
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                                <FiCalendar className="w-3 h-3" />
+                                                {formatDateTime(r.scheduledAt)}
+                                            </span>
+                                            {r.advanceNotice > 0 && (
+                                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400">
+                                                    <FiBell className="w-3 h-3" />
+                                                    {formatAdvanceNotice(r.advanceNotice)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className={'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ' + (isSoon && !isMuted
                                             ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
                                             : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400')}>
                                             <FiClock className="w-3 h-3" />
@@ -515,6 +610,15 @@ export default function ScheduledReminders() {
                     </div>
                 )}
             </div>
+
+            {/* Edit Reminder Modal */}
+            {editingReminder && (
+                <TaskReminderModal
+                    isOpen={Boolean(editingReminder)}
+                    onClose={() => setEditingReminder(null)}
+                    initialData={editingReminder}
+                />
+            )}
         </div>
     );
 }

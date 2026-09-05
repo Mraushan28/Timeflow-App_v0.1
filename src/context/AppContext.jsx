@@ -44,6 +44,14 @@ function createFreshState() {
     scheduledReminders: [],
     reminderHistory: [],
     challenges: [],
+    notificationSettings: {
+      enabled: false,
+      soundEnabled: true,
+      timerNotifications: true,
+      breakNotifications: true,
+      scheduleNotifications: true,
+      defaultAdvanceMinutes: 5,
+    },
   };
 }
 
@@ -199,9 +207,24 @@ function loadState() {
       theme: parsed.theme || 'light',
       appActive: parsed.appActive === true,
       selectedWorker: parsed.selectedWorker || 'All Workers',
-      scheduledReminders: Array.isArray(parsed.scheduledReminders) ? parsed.scheduledReminders : [],
+      scheduledReminders: (Array.isArray(parsed.scheduledReminders) ? parsed.scheduledReminders : []).map(r => ({
+        ...r,
+        isEnabled: r.isEnabled !== false,
+        advanceNotice: Number(r.advanceNotice) || 0,
+        advanceNotified: r.advanceNotified === true,
+        exactNotified: r.exactNotified === true,
+        taskId: r.taskId || null,
+      })),
       reminderHistory: Array.isArray(parsed.reminderHistory) ? parsed.reminderHistory : [],
       challenges: challenges.map(c => ({ ...createFreshChallenge(), ...c })),
+      notificationSettings: {
+        enabled: parsed.notificationSettings?.enabled ?? false,
+        soundEnabled: parsed.notificationSettings?.soundEnabled ?? true,
+        timerNotifications: parsed.notificationSettings?.timerNotifications ?? true,
+        breakNotifications: parsed.notificationSettings?.breakNotifications ?? true,
+        scheduleNotifications: parsed.notificationSettings?.scheduleNotifications ?? true,
+        defaultAdvanceMinutes: parsed.notificationSettings?.defaultAdvanceMinutes ?? 5,
+      },
     };
 
     // Auto-fill missed challenge days (if any gap) and reset streak accordingly
@@ -243,6 +266,7 @@ function saveState(state) {
       scheduledReminders: state.scheduledReminders,
       reminderHistory: state.reminderHistory,
       challenges: state.challenges,
+      notificationSettings: state.notificationSettings,
     }));
   } catch (e) {
     console.warn('Failed to save state:', e);
@@ -377,20 +401,77 @@ function appReducer(state, action) {
         },
       };
     }
+    case 'UPDATE_NOTIFICATION_SETTINGS': {
+      return {
+        ...state,
+        notificationSettings: {
+          ...state.notificationSettings,
+          ...action.payload,
+        },
+      };
+    }
     case 'ADD_SCHEDULED_REMINDER': {
       const newReminder = {
-        id: 'reminder-' + Date.now(),
+        id: action.payload.id || ('reminder-' + Date.now()),
+        taskId: action.payload.taskId || null,
         name: action.payload.name,
         description: action.payload.description || '',
         scheduledAt: action.payload.scheduledAt,
+        advanceNotice: Number(action.payload.advanceNotice) || 0,
         worker: action.payload.worker || '',
         status: 'PENDING',
+        isEnabled: action.payload.isEnabled !== false,
+        advanceNotified: false,
+        exactNotified: false,
         triggeredAt: null,
         createdAt: new Date().toISOString(),
       };
       return {
         ...state,
         scheduledReminders: [...state.scheduledReminders, newReminder],
+      };
+    }
+    case 'UPDATE_SCHEDULED_REMINDER': {
+      const { reminderId, updates } = action.payload;
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.map(r => {
+          if (r.id !== reminderId) return r;
+          const updated = { ...r, ...updates };
+          // If scheduled time was modified to a future time, reset notification flags and status
+          if (updates.scheduledAt && new Date(updates.scheduledAt).getTime() > Date.now()) {
+            updated.advanceNotified = false;
+            updated.exactNotified = false;
+            if (updated.status === 'TRIGGERED') {
+              updated.status = 'PENDING';
+            }
+          }
+          return updated;
+        }),
+      };
+    }
+    case 'TOGGLE_SCHEDULED_REMINDER': {
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.map(r =>
+          r.id === action.payload.reminderId ? { ...r, isEnabled: !r.isEnabled } : r
+        ),
+      };
+    }
+    case 'MARK_REMINDER_ADVANCE_NOTIFIED': {
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.map(r =>
+          r.id === action.payload.reminderId ? { ...r, advanceNotified: true } : r
+        ),
+      };
+    }
+    case 'MARK_REMINDER_EXACT_NOTIFIED': {
+      return {
+        ...state,
+        scheduledReminders: state.scheduledReminders.map(r =>
+          r.id === action.payload.reminderId ? { ...r, exactNotified: true } : r
+        ),
       };
     }
     case 'DELETE_SCHEDULED_REMINDER': {
@@ -604,9 +685,16 @@ export function AppProvider({ children }) {
 
   // Scheduled reminders
   const addScheduledReminder = useCallback((r) => dispatch({ type: 'ADD_SCHEDULED_REMINDER', payload: r }), []);
+  const updateScheduledReminder = useCallback((id, updates) => dispatch({ type: 'UPDATE_SCHEDULED_REMINDER', payload: { reminderId: id, updates } }), []);
+  const toggleScheduledReminder = useCallback((id) => dispatch({ type: 'TOGGLE_SCHEDULED_REMINDER', payload: { reminderId: id } }), []);
+  const markReminderAdvanceNotified = useCallback((id) => dispatch({ type: 'MARK_REMINDER_ADVANCE_NOTIFIED', payload: { reminderId: id } }), []);
+  const markReminderExactNotified = useCallback((id) => dispatch({ type: 'MARK_REMINDER_EXACT_NOTIFIED', payload: { reminderId: id } }), []);
   const deleteScheduledReminder = useCallback((id) => dispatch({ type: 'DELETE_SCHEDULED_REMINDER', payload: { reminderId: id } }), []);
   const triggerScheduledReminder = useCallback((id) => dispatch({ type: 'TRIGGER_SCHEDULED_REMINDER', payload: { reminderId: id } }), []);
   const resolveScheduledReminder = useCallback((id, approved) => dispatch({ type: 'RESOLVE_SCHEDULED_REMINDER', payload: { reminderId: id, approved } }), []);
+
+  // Notification settings
+  const updateNotificationSettings = useCallback((settings) => dispatch({ type: 'UPDATE_NOTIFICATION_SETTINGS', payload: settings }), []);
 
   // 30-Day Challenge (multiple parallel challenges)
   const addChallenge = useCallback((name, targetHours, targetTasks, id, description) =>
@@ -631,8 +719,10 @@ export function AppProvider({ children }) {
     startTimer, pauseTimer, resumeTimer, stopTimer,
     dismissAlarm, setAlarmActive,
     resetAllData,
-    addScheduledReminder, deleteScheduledReminder,
+    addScheduledReminder, updateScheduledReminder, toggleScheduledReminder,
+    markReminderAdvanceNotified, markReminderExactNotified, deleteScheduledReminder,
     triggerScheduledReminder, resolveScheduledReminder,
+    updateNotificationSettings,
     addChallenge, deleteChallenge, startChallenge, completeChallengeDay, missChallengeDay, resetChallenge,
   };
 

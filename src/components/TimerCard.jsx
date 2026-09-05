@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatTime, formatTimeShort } from '../utils/helpers';
+import { formatTime, formatTimeShort, formatCountdown } from '../utils/helpers';
 import { startLoopingAlarm } from '../utils/audio';
+import { sendNotification } from '../utils/notifications';
+import TaskReminderModal from './TaskReminderModal';
 import {
   FiPlay, FiPause, FiSquare, FiClock, FiEdit2, FiTrash2, FiCheck, FiX,
-  FiTarget, FiActivity, FiAlertTriangle, FiUser, FiVolumeX,
+  FiTarget, FiActivity, FiAlertTriangle, FiUser, FiVolumeX, FiBell, FiCoffee,
 } from 'react-icons/fi';
 
 export default function TimerCard({ task, isEditing, editName, onStartEditing, onEditNameChange, onSaveRename, onCancelEditing, onDelete, isTimerRunning }) {
@@ -16,9 +18,16 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
   const [countdownReached, setCountdownReached] = useState(false);
   const [displayTime, setDisplayTime] = useState('00:00:00');
   const [alarmDismissed, setAlarmDismissed] = useState(false);
+  const [isBreakMode, setIsBreakMode] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
   const alarmPlayedRef = useRef(false);
   const audioUnlocked = useRef(false);
   const stopAlarmRef = useRef(null);
+
+  // Active scheduled reminder for this task if any
+  const taskReminder = (state.scheduledReminders || []).find(
+    r => r.taskId === task.id && r.status === 'PENDING' && r.isEnabled !== false
+  );
 
   // Compute display time from timer state
   // LOG_ELAPSED in AppContext already updates elapsed via delta every second.
@@ -41,16 +50,46 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
       if (remaining === 0 && !alarmPlayedRef.current && !alarmDismissed) {
         setCountdownReached(true);
         alarmPlayedRef.current = true;
-        try {
-          stopAlarmRef.current = startLoopingAlarm();
-        } catch (e) {
-          console.warn('Looping alarm failed:', e);
+
+        if (state.notificationSettings?.soundEnabled !== false) {
+          try {
+            stopAlarmRef.current = startLoopingAlarm();
+          } catch (e) {
+            console.warn('Looping alarm failed:', e);
+          }
+        }
+
+        // Fire native background notification
+        if (isBreakMode) {
+          if (state.notificationSettings?.breakNotifications !== false) {
+            sendNotification(`Break Finished! ⚡`, {
+              body: `Your break session for "${task.name}" has completed. Ready to focus again?`,
+              tag: `timeflow-break-${task.id}`,
+              requireInteraction: true,
+              data: {
+                type: 'break-finish',
+                taskId: task.id,
+              },
+            });
+          }
+        } else {
+          if (state.notificationSettings?.timerNotifications !== false) {
+            sendNotification(`Focus Time Complete! 🎯`, {
+              body: `Target countdown for "${task.name}" has completed. Time for a well-deserved break!`,
+              tag: `timeflow-timer-${task.id}`,
+              requireInteraction: true,
+              data: {
+                type: 'timer-finish',
+                taskId: task.id,
+              },
+            });
+          }
         }
       }
     } else {
       setDisplayTime(formatTime(totalElapsed));
     }
-  }, [timer, alarmDismissed]);
+  }, [timer, alarmDismissed, isBreakMode, state.notificationSettings, task.name, task.id]);
 
   // Cleanup alarm on unmount
   useEffect(() => {
@@ -74,6 +113,7 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
     unlockAudio();
     const totalSec = (countdownInput.h || 0) * 3600 + (countdownInput.m || 0) * 60;
     if (totalSec <= 0) return;
+    setIsBreakMode(false);
     setCountdownReached(false);
     alarmPlayedRef.current = false;
     setAlarmDismissed(false);
@@ -82,7 +122,21 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
 
   const handleStartStopwatch = () => {
     unlockAudio();
+    setIsBreakMode(false);
     startTimer(task.id, 'stopwatch', 0);
+  };
+
+  const handleStartBreak = (minutes) => {
+    unlockAudio();
+    if (stopAlarmRef.current) {
+      stopAlarmRef.current();
+      stopAlarmRef.current = null;
+    }
+    setAlarmDismissed(false);
+    setCountdownReached(false);
+    alarmPlayedRef.current = false;
+    setIsBreakMode(true);
+    startTimer(task.id, 'countdown', minutes * 60);
   };
 
   const handlePause = () => {
@@ -134,9 +188,8 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
 
   return (
     <div
-      className={`card relative overflow-hidden group transition-all duration-300 ${
-        isRunning && !isAlarmRinging ? 'ring-2 ring-primary-500/40 shadow-lg shadow-primary-500/10' : ''
-      } ${isAlarmRinging ? 'ring-2 ring-red-500/60 shadow-lg shadow-red-500/20 animate-pulse-slow' : ''}`}
+      className={`card relative overflow-hidden group transition-all duration-300 ${isRunning && !isAlarmRinging ? 'ring-2 ring-primary-500/40 shadow-lg shadow-primary-500/10' : ''
+        } ${isAlarmRinging ? 'ring-2 ring-red-500/60 shadow-lg shadow-red-500/20 animate-pulse-slow' : ''}`}
     >
       {isRunning && !isAlarmRinging && (
         <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-transparent pointer-events-none" />
@@ -188,6 +241,16 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
                     </span>
                   </div>
                 )}
+                {taskReminder && (
+                  <button
+                    onClick={() => setShowReminderModal(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 mt-1 rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 transition-colors"
+                    title="Click to edit reminder"
+                  >
+                    <FiBell className="w-3 h-3" />
+                    {formatCountdown(taskReminder.scheduledAt)}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -195,6 +258,14 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
 
         {!isEditing && !isRunning && !isPaused && !isAlarmRinging && (
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => setShowReminderModal(true)}
+              className={`p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${taskReminder ? 'text-primary-500' : 'text-slate-400 hover:text-primary-500'
+                }`}
+              title={taskReminder ? 'Edit Reminder' : 'Set Reminder'}
+            >
+              <FiBell className="w-3.5 h-3.5" />
+            </button>
             <button
               onClick={onStartEditing}
               className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
@@ -216,9 +287,8 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
       {/* Timer Display */}
       <div className="text-center py-4">
         <div
-          className={`text-4xl font-bold tracking-wider tabular-nums ${
-            isAlarmRinging ? 'text-red-500' : ''
-          }`}
+          className={`text-4xl font-bold tracking-wider tabular-nums ${isAlarmRinging ? 'text-red-500' : ''
+            }`}
           style={{ color: isRunning && !isAlarmRinging ? task.color : 'var(--color-text)' }}
         >
           {displayTime}
@@ -258,22 +328,20 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('stopwatch')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all ${
-                  mode === 'stopwatch'
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all ${mode === 'stopwatch'
                     ? 'bg-primary-500 text-white shadow-sm'
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
+                  }`}
               >
                 <FiActivity className="w-4 h-4" />
                 Stopwatch
               </button>
               <button
                 onClick={() => setMode('countdown')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all ${
-                  mode === 'countdown'
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-all ${mode === 'countdown'
                     ? 'bg-primary-500 text-white shadow-sm'
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
+                  }`}
               >
                 <FiTarget className="w-4 h-4" />
                 Countdown
@@ -325,22 +393,44 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
           <>
             <div className="flex gap-2">
               {isAlarmRinging ? (
-                <>
-                  <button
-                    onClick={handleDismissAlarm}
-                    className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2.5 text-red-600 border-red-300 dark:border-red-700"
-                  >
-                    <FiVolumeX className="w-4 h-4" />
-                    Dismiss Alarm
-                  </button>
-                  <button
-                    onClick={handleStop}
-                    className="btn-danger flex items-center justify-center gap-2 py-2.5 px-4"
-                  >
-                    <FiSquare className="w-4 h-4" />
-                    Stop
-                  </button>
-                </>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDismissAlarm}
+                      className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2.5 text-red-600 border-red-300 dark:border-red-700 text-xs sm:text-sm font-semibold"
+                    >
+                      <FiVolumeX className="w-4 h-4" />
+                      Dismiss
+                    </button>
+                    <button
+                      onClick={handleStop}
+                      className="btn-danger flex items-center justify-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-semibold"
+                    >
+                      <FiSquare className="w-4 h-4" />
+                      Stop
+                    </button>
+                  </div>
+
+                  {/* Quick Break Buttons */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => handleStartBreak(5)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-100 transition-colors"
+                      title="Start a 5-minute break countdown"
+                    >
+                      <FiCoffee className="w-3.5 h-3.5" />
+                      5m Break
+                    </button>
+                    <button
+                      onClick={() => handleStartBreak(15)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors"
+                      title="Start a 15-minute break countdown"
+                    >
+                      <FiCoffee className="w-3.5 h-3.5" />
+                      15m Break
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <>
                   {isRunning ? (
@@ -379,6 +469,16 @@ export default function TimerCard({ task, isEditing, editName, onStartEditing, o
           </>
         )}
       </div>
+
+      {/* Task Reminder Modal */}
+      {showReminderModal && (
+        <TaskReminderModal
+          isOpen={showReminderModal}
+          onClose={() => setShowReminderModal(false)}
+          task={task}
+          initialData={taskReminder}
+        />
+      )}
     </div>
   );
 }

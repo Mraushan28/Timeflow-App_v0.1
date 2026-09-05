@@ -2,6 +2,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register PWA service worker with auto-update
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log('[TimeFlow] PWA content update available');
+  },
+  onOfflineReady() {
+    console.log('[TimeFlow] PWA ready for offline use');
+  },
+});
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -45,9 +45,11 @@ export default defineConfig({
         'pwa-512x512.svg',
         'robots.txt',
         'sitemap.xml',
+        'sw-custom.js',
       ],
       manifest,
       workbox: {
+        importScripts: ['/sw-custom.js'],
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2,txt,xml}'],
         navigateFallbackDenylist: [/^\/robots\.txt$/, /^\/sitemap\.xml$/],
         runtimeCaching: [
