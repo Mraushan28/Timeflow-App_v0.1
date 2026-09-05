@@ -1,5 +1,17 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { getDateKey } from '../utils/helpers';
+import {
+  getCurrentUser,
+  onAuthStateChange,
+  performInitialSync,
+  triggerDebouncedSync,
+  pushCloudData,
+  subscribeSyncStatus,
+  getSyncStatus,
+  getLastSyncedAt,
+  deleteCloudData,
+} from '../utils/syncService';
+import { mergeBackupState } from '../utils/backupIO';
 
 const AppContext = createContext();
 
@@ -288,6 +300,34 @@ function appReducer(state, action) {
         console.warn('Failed to clear localStorage:', e);
       }
       return createFreshState();
+    }
+    case 'LOAD_STATE_SNAPSHOT': {
+      const incoming = action.payload;
+      return {
+        ...state,
+        tasks: incoming.tasks || [],
+        history: incoming.history || {},
+        scheduledReminders: (incoming.scheduledReminders || []).map(r => ({
+          ...r,
+          isEnabled: r.isEnabled !== false,
+          advanceNotice: Number(r.advanceNotice) || 0,
+          advanceNotified: Boolean(r.advanceNotified),
+          exactNotified: Boolean(r.exactNotified),
+          taskId: r.taskId || null,
+        })),
+        reminderHistory: incoming.reminderHistory || [],
+        challenges: (incoming.challenges || []).map(c => ({ ...createFreshChallenge(), ...c })),
+        notificationSettings: incoming.notificationSettings ? {
+          ...state.notificationSettings,
+          ...incoming.notificationSettings,
+        } : state.notificationSettings,
+        theme: incoming.theme || state.theme,
+        appActive: incoming.appActive ?? state.appActive,
+        selectedWorker: incoming.selectedWorker || state.selectedWorker,
+      };
+    }
+    case 'MERGE_STATE_SNAPSHOT': {
+      return mergeBackupState(state, action.payload);
     }
     case 'TOGGLE_THEME': {
       return { ...state, theme: state.theme === 'light' ? 'dark' : 'light' };
@@ -640,14 +680,56 @@ function appReducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, null, loadState);
+  const [authUser, setAuthUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(getSyncStatus());
+  const [lastSyncedAt, setLastSyncedAt] = useState(getLastSyncedAt());
   const intervalRef = useRef(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Persist to localStorage on every state change
+  // Subscribe to sync status updates
+  useEffect(() => {
+    const unsub = subscribeSyncStatus((status, time) => {
+      setSyncStatus(status);
+      setLastSyncedAt(time);
+    });
+    return unsub;
+  }, []);
+
+  // Listen to Supabase auth events & run initial sync on sign in
+  useEffect(() => {
+    getCurrentUser().then(user => {
+      setAuthUser(user);
+    });
+
+    const subscription = onAuthStateChange(async (event, session) => {
+      const user = session?.user || null;
+      setAuthUser(user);
+
+      if (event === 'SIGNED_IN' && user) {
+        try {
+          const res = await performInitialSync(user, stateRef.current);
+          if (res.action === 'pulled_remote' || res.action === 'merged') {
+            dispatch({ type: 'LOAD_STATE_SNAPSHOT', payload: res.state });
+          }
+        } catch (e) {
+          console.warn('[TimeFlow Sync] Initial sync failed:', e);
+        }
+      }
+    });
+
+    return () => {
+      if (subscription?.unsubscribe) subscription.unsubscribe();
+    };
+  }, []);
+
+  // Persist to localStorage on every state change and trigger debounced cloud sync if authenticated
   useEffect(() => {
     saveState(state);
-  }, [state]);
+    if (authUser?.id) {
+      triggerDebouncedSync(authUser.id, state, 3000);
+    }
+  }, [state, authUser]);
 
   // Apply theme class
   useEffect(() => {
@@ -683,6 +765,30 @@ export function AppProvider({ children }) {
   const setAlarmActive = useCallback((id) => dispatch({ type: 'SET_ALARM_ACTIVE', payload: { taskId: id } }), []);
   const resetAllData = useCallback(() => dispatch({ type: 'RESET_ALL_DATA' }), []);
 
+  // Snapshot import / merge helpers
+  const loadStateSnapshot = useCallback((snapshot) => {
+    dispatch({ type: 'LOAD_STATE_SNAPSHOT', payload: snapshot });
+    if (authUser?.id) {
+      pushCloudData(authUser.id, snapshot);
+    }
+  }, [authUser]);
+
+  const mergeStateSnapshot = useCallback((snapshot) => {
+    dispatch({ type: 'MERGE_STATE_SNAPSHOT', payload: snapshot });
+  }, []);
+
+  const manualSync = useCallback(async () => {
+    if (!authUser?.id) return { success: false, error: 'Not authenticated' };
+    return await pushCloudData(authUser.id, stateRef.current);
+  }, [authUser]);
+
+  const resetAllDataWithCloud = useCallback(async (deleteCloud = false) => {
+    if (deleteCloud && authUser?.id) {
+      await deleteCloudData(authUser.id);
+    }
+    dispatch({ type: 'RESET_ALL_DATA' });
+  }, [authUser]);
+
   // Scheduled reminders
   const addScheduledReminder = useCallback((r) => dispatch({ type: 'ADD_SCHEDULED_REMINDER', payload: r }), []);
   const updateScheduledReminder = useCallback((id, updates) => dispatch({ type: 'UPDATE_SCHEDULED_REMINDER', payload: { reminderId: id, updates } }), []);
@@ -714,6 +820,8 @@ export function AppProvider({ children }) {
 
   const value = {
     state, workers,
+    authUser, syncStatus, lastSyncedAt,
+    manualSync, loadStateSnapshot, mergeStateSnapshot, resetAllDataWithCloud,
     toggleTheme, toggleAppActive, setSelectedWorker,
     addTask, renameTask, deleteTask,
     startTimer, pauseTimer, resumeTimer, stopTimer,
